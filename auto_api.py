@@ -72,7 +72,12 @@ class BuildAPI:
         return result
 
     @staticmethod
-    def make_fun(fn_name, fn_params, strict_parameters_resolution):
+    def make_fun(fn_name, fn_params, fn_defaults, fn_defaults_dt, strict_parameters_resolution):
+        def str_quotes(var, class_name):
+            if 'str' in str(class_name):
+                return '\"' + str(var) + '\"'
+            else:
+                return str(var)
         complete_params = ', '.join(fn_params)
 
         # Build a runtime function body
@@ -80,17 +85,21 @@ class BuildAPI:
                   f"\n" +\
                   f"\n" +\
                   f"def {fn_name}():\n"
-        for param in fn_params:
+        for i in range(len(fn_params)):
+            param = fn_params[i]
             if strict_parameters_resolution:
-                fn_body += "\t" + param + ' = request.args["' + param + '"]\n'
+                fn_body += "\t" + param + ' = request.args["' + param + '"]'
             else:
-                fn_body += "\t" + param + ' = request.args.get("' + param + '")\n'
+                fn_body += "\t" + param + ' = request.args.get("' + param + '")'
+            if fn_defaults[i] is not None:
+                fn_body += ' or ' + str_quotes(str(fn_defaults[i]), fn_defaults_dt[i]) + '\n'
+            else:
+                fn_body += '\n'
+
         fn_body += f"\treturn svc.{fn_name}({complete_params})\n"
-        '''
-        Logger.info(f'=== Creating {fn_name} ===\n' +
-                    fn_body +
-                    '\n==================\n')
-        '''
+
+        Logger.info(f'=== Creating {fn_name} ===\n' + fn_body + '\n==================\n')
+
         exec(fn_body)
         return locals()[fn_name]
 
@@ -100,15 +109,24 @@ class BuildAPI:
             Logger.warn("Duplicate function definition discarded for:" + fn_name)
             return
         fn_pointer = getattr(svc, fn_name)
+        # fn_params = list(inspect.signature(fn_pointer).parameters.keys())
+        fn_items = list(inspect.signature(fn_pointer).parameters.items())
         fn_params = list(inspect.signature(fn_pointer).parameters.keys())
         fn_params = fn_params.remove('self') if 'self' in fn_params else fn_params
+        fn_defaults = list(inspect.signature(fn_pointer).parameters.values())
+        fn_defaults_dt = []
+        for i in range(len(fn_defaults)):
+            fn_defaults[i] = fn_defaults[i].default if fn_defaults[i].default is not inspect.Parameter.empty else None
+        for fn_def in fn_defaults:
+            fn_defaults_dt.append(type(fn_def))
 
-        proxy_fn = self.make_fun(fn_name, fn_params, self.strict_parameters_resolution)
+        proxy_fn = self.make_fun(fn_name, fn_params, fn_defaults, fn_defaults_dt, self.strict_parameters_resolution)
         setattr(self.ArgumentsBucket, fn_name, proxy_fn)
         self.api_routes.route("/" + fn_name)(proxy_fn)
         Logger.info(' '.join(["\u2713 Binding fn:[", fn_name, "] to: endpoint [", self.endpoints_list[index], "]",
                               "accepting HTTP methods:[", str(self.http_methods_list[index]),
-                              "] by matching the variables:", str(fn_params), "at the function:[", str(proxy_fn), "]"]))
+                              "] by matching the variables:", str(fn_params), "with the defaults classed as:",
+                              str(fn_defaults_dt), "at the function:[", str(proxy_fn), "]"]))
 
     def create_app(self, module_name):
         """
@@ -117,7 +135,7 @@ class BuildAPI:
         :return:
         """
         app = Flask(module_name, instance_relative_config=False)
-        app.url_map.strict_slashes = False
+        app.url_map.strict_slashes = self.strict_slashes
         app.register_blueprint(self.api_routes, url_prefix='/' + self.prefix)
 
         @app.route('/')
@@ -170,7 +188,7 @@ class BuildAPI:
         return app
 
     def __init__(self, target, module_name, prefix='auto', exclusion_list=[], inclusion_list=[],
-                 http_methods_list=[], endpoints_list=[], strict_parameters_resolution=False,
+                 http_methods_list=[], endpoints_list=[], strict_parameters_resolution=False, strict_slashes=False,
                  host='0.0.0.0', port=5000):
 
         # Store the original parameters
@@ -182,6 +200,7 @@ class BuildAPI:
         self.http_methods_list = http_methods_list
         self.endpoints_list = endpoints_list
         self.strict_parameters_resolution = strict_parameters_resolution
+        self.strict_slashes = strict_slashes
         self.host = host
         self.port = port
 
@@ -208,4 +227,4 @@ class BuildAPI:
 
 
 if __name__ == "__main__":
-    b_api = BuildAPI(target='target', module_name='Service', prefix='', strict_parameters_resolution=True)
+    b_api = BuildAPI(target='target', module_name='Service', prefix='', strict_parameters_resolution=False)

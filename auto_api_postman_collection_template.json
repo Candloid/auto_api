@@ -22,6 +22,14 @@
 					"port": "{{ port }}",
 					"path": [
 						"{{ path[i] }}"
+					],
+					"query": [
+						{%for j in range(0, jlen)%}
+						{
+							"key": "{{ key_name[i] }}",
+							"value": "{{ key_value[i] }}"
+						},
+						{%endfor%}
 					]
 				}
 			},

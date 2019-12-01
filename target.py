@@ -15,7 +15,7 @@ class Service:
             return 'Set a value for p1 please...'
         return inspect.currentframe().f_code.co_name + '<br>' + str(p1)
 
-    def get_b(self, pa1, pa2, pa3):
+    def get_b(self, pa1='alpha', pa2=10, pa3=True):
         return inspect.currentframe().f_code.co_name + '<br>' + str([pa1, pa2, pa3])
 
     def get_c(self):
