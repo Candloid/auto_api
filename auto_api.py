@@ -1,7 +1,7 @@
-from flask import Flask, Blueprint, render_template, request
+from flask import Flask, Blueprint, render_template, render_template_string, jsonify
+from json import dumps, loads
 import inspect
 from logger import Logger
-import itertools
 
 
 class BuildAPI:
@@ -140,31 +140,38 @@ class BuildAPI:
         @app.route('/postman')
         def get_postman_json():
             fn_pairs = []
-            for index in range(len(self.fn_names_list)):
-                fn_pairs.extend(list(itertools.product(self.fn_names_list[index], self.http_methods_list[index])))
+            for methods_index in range(len(self.http_methods_list)):
+                for method in self.http_methods_list[methods_index]:
+                    fn_pairs.append([self.fn_names_list[methods_index], method])
 
             short_host = ''
             for char in self.host:
                 if char.isdigit() or char == '.':
                     short_host += char
             host_a, host_b, host_c, host_d = short_host.split('.')
-
-            short_host.replace('/','')
-            params={}
-            params['app_name']=self.module_name
-            params['raw_host']="http://"+short_host+'/'
-            params['host_a']=host_a
-            params['host_b']=host_b
-            params['host_c']=host_c
-            params['host_d']=host_d
-            return render_template('auto_api.postman_collection.json', app_name=self.module_name,
-                                   raw_host='', host_a=, host_b=, host_c=, host_d=)
+            params = {
+                "app_name": self.module_name,
+                "raw_host": "http://"+short_host+"/",
+                "host_a": host_a,
+                "host_b": host_b,
+                "host_c": host_c,
+                "host_d": host_d,
+                "fn_pairs": fn_pairs,
+                "ilen": len(fn_pairs),
+                "port": self.port,
+                "path": self.endpoints_list
+            }
+            with open('auto_api_postman_collection_template.json', 'r') as file:
+                data = file.read()
+            json_string = render_template_string(data, **params)
+            return json_string, 200, {'Content-Type': 'application/json; charset=utf-8'}
 
         root()
         return app
 
     def __init__(self, target, module_name, prefix='auto', exclusion_list=[], inclusion_list=[],
-                 http_methods_list=[], endpoints_list=[], strict_parameters_resolution=False, host='0.0.0.0'):
+                 http_methods_list=[], endpoints_list=[], strict_parameters_resolution=False,
+                 host='0.0.0.0', port=5000):
 
         # Store the original parameters
         self.target = target
@@ -176,6 +183,7 @@ class BuildAPI:
         self.endpoints_list = endpoints_list
         self.strict_parameters_resolution = strict_parameters_resolution
         self.host = host
+        self.port = port
 
         # Dynamically import the `module_name` class from the target `python` file
         #  and loads all of the methods there is unless excluded
@@ -196,7 +204,7 @@ class BuildAPI:
         auto_api = self.create_app(module_name)
         Logger.info('Routes Map:')
         Logger.info(auto_api.url_map)
-        auto_api.run(debug=True, host=self.host)
+        auto_api.run(debug=True, host=self.host, port=self.port)
 
 
 if __name__ == "__main__":

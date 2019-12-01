@@ -55,3 +55,7 @@ class Logger:
     @staticmethod
     def error(message):
         print(C_RED + C_BLINK + str(message) + C_END)
+
+    @staticmethod
+    def blink(message):
+        print(C_BLINK + str(message) + C_END)

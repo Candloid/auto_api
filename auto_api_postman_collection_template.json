@@ -1,15 +1,15 @@
 {
 	"info": {
 		"name": "{{ app_name }}",
-		"description": "Automatically-generated `Postman` collection by auto_api for testing `{{ app_name }}`",
+		"description": "Automatically-generated `Postman` collection by `auto_api` for testing `{{ app_name }}`",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
 		{%for i in range(0, ilen)%}
 		{
-			"name": "{{ fn_names_list[i] }}",
+			"name": "{{ fn_pairs[i][0] }}",
 			"request": {
-				"method": "{{ http_method[i] }}",
+				"method": "{{ fn_pairs[i][1] }}",
 				"header": [],
 				"url": {
 					"raw": "{{ raw_host }}",
@@ -30,13 +30,11 @@
 		{%endfor%}
 	],
 	"variable": [
-		{%for j in range(0, jlen)%}
 		{
 			"key": "prefix",
 			"value": "auto",
 			"type": "string"
 		},
-		{%endfor%}
 	],
 	"protocolProfileBehavior": {}
 }
