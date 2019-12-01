@@ -1,0 +1,42 @@
+{
+	"info": {
+		"name": "{{ app_name }}",
+		"description": "Automatically-generated `Postman` collection by auto_api for testing `{{ app_name }}`",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{%for i in range(0, ilen)%}
+		{
+			"name": "{{ fn_names_list[i] }}",
+			"request": {
+				"method": "{{ http_method[i] }}",
+				"header": [],
+				"url": {
+					"raw": "{{ raw_host }}",
+					"host": [
+						"{{ host_a }}",
+						"{{ host_b }}",
+						"{{ host_c }}",
+						"{{ host_d }}"
+					],
+					"port": "{{ port }}",
+					"path": [
+						"{{ path[i] }}"
+					]
+				}
+			},
+			"response": []
+		},
+		{%endfor%}
+	],
+	"variable": [
+		{%for j in range(0, jlen)%}
+		{
+			"key": "prefix",
+			"value": "auto",
+			"type": "string"
+		},
+		{%endfor%}
+	],
+	"protocolProfileBehavior": {}
+}
