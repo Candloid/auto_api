@@ -1,5 +1,7 @@
 from flask import Flask, Blueprint, render_template, render_template_string, jsonify
 import inspect
+import json
+from jsoncomment import JsonComment
 from logger import Logger
 
 
@@ -191,8 +193,12 @@ class BuildAPI:
             for entry in substitution_dictionary:
                 value = substitution_dictionary[entry]
                 json_string = json_string.replace(entry, value)
+
+            parser = JsonComment(json)
+            data = parser.loads(json_string)
+            Logger.warn(data)
             ep_response = app.response_class(
-                response=json_string,
+                response=str(data).replace('\'', "\"").replace('\"{', '{').replace('}\"', '}'),
                 status=200,
                 mimetype='application/json'
             )
