@@ -21,8 +21,8 @@ class Service:
     def get_c(self):
         return self.__doc__
 
-    def get_post_d(self, par1):
-        return inspect.currentframe().f_code.co_name
+    def get_post_d(self, par1=[1, 2, 3, 4]):
+        return inspect.currentframe().f_code.co_name + str(par1)
 
-    def delete_e(self, param1):
-        return inspect.currentframe().f_code.co_name
+    def delete_e(self, param1={'some': 'map'}):
+        return inspect.currentframe().f_code.co_name + str(param1)

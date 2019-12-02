@@ -1,33 +1,33 @@
 {
 	"info": {
-		"name": "{{ app_name }}",
-		"description": "Automatically-generated `Postman` collection by `auto_api` for testing `{{ app_name }}`",
+		"name": "{{app_name}}",
+		"description": "Automatically-generated `Postman` collection by `auto_api` for testing `{{app_name}}`",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
-		{%for i in range(0, ilen)%}
+		{%for i in range(0,len_fn_names_list)%}
+		{%for j in range(0,len_http_methods_list[i])%}
 		{
-			"name": "{{ fn_pairs[i][0] }}",
+			"name": "{{fn_names_list[i]}}",
 			"request": {
-				"method": "{{ fn_pairs[i][1] }}",
+				"method": "{{http_methods_list[i][j]}}",
 				"header": [],
 				"url": {
-					"raw": "{{ raw_host }}",
 					"host": [
-						"{{ host_a }}",
-						"{{ host_b }}",
-						"{{ host_c }}",
-						"{{ host_d }}"
+						"{{host_a}}",
+						"{{host_b}}",
+						"{{host_c}}",
+						"{{host_d}}"
 					],
-					"port": "{{ port }}",
+					"port": "{{port}}",
 					"path": [
-						"{{ path[i] }}"
+						"{{endpoints[i]}}"
 					],
 					"query": [
-						{%for j in range(0, jlen)%}
+						{%for k in range(0,len_fn_params[i])%}
 						{
-							"key": "{{ key_name[i] }}",
-							"value": "{{ key_value[i] }}"
+							"key": "{{fn_params[i][k]}}",
+							"value": "{{fn_defaults[i][k]}}"
 						},
 						{%endfor%}
 					]
@@ -36,13 +36,14 @@
 			"response": []
 		},
 		{%endfor%}
+		{%endfor%}
 	],
 	"variable": [
 		{
 			"key": "prefix",
-			"value": "auto",
+			"value": "{{prefix}}",
 			"type": "string"
-		},
+		}
 	],
 	"protocolProfileBehavior": {}
 }
