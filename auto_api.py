@@ -1,4 +1,5 @@
-from flask import Flask, Blueprint, render_template, render_template_string, jsonify
+import os
+from flask import Flask, Blueprint, request, jsonify, render_template, render_template_string, url_for, send_from_directory
 import inspect
 import json
 from jsoncomment import JsonComment
@@ -32,9 +33,9 @@ class BuildAPI:
         result = []
         instance_list = []
         http_methods = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
-        for index in range(len(fn_names_list)):
+        for fn_name in fn_names_list:
             for http_method in http_methods:
-                if http_method in fn_names_list[index].upper():
+                if http_method + "_" in fn_name.upper():
                     instance_list.append(http_method)
             if not instance_list:
                 result.append('GET')
@@ -73,18 +74,20 @@ class BuildAPI:
         return result
 
     @staticmethod
-    def make_fun(fn_name, fn_params, fn_defaults, fn_defaults_dt, strict_parameters_resolution):
+    def make_fun(fn_name, fn_params, fn_defaults, fn_defaults_dt, strict_parameters_resolution, enforce_blank_defaults):
         def process_per_class(var, class_name):
             if 'str' in str(class_name):
                 return '\"' + str(var) + '\"'
             elif 'dict' in str(class_name):
                 return str(var).replace("'", "\"")
+            elif all(number in str(class_name) for number in ['int', 'float', 'long', 'complex']):
+                return class_name(var)
             else:
                 return str(var)
         complete_params = ', '.join(fn_params)
 
         # Build a runtime function body
-        fn_body = f"from flask import request\n" +\
+        fn_body = f"from flask import request, jsonify\n" +\
                   f"\n" +\
                   f"\n" +\
                   f"def {fn_name}():\n"
@@ -94,14 +97,19 @@ class BuildAPI:
                 fn_body += "\t" + param + ' = request.args["' + param + '"]'
             else:
                 fn_body += "\t" + param + ' = request.args.get("' + param + '")'
-            if fn_defaults[i] != '':
+            if fn_defaults[i] != '' or enforce_blank_defaults:
                 fn_body += ' or ' + process_per_class(str(fn_defaults[i]), fn_defaults_dt[i]) + '\n'
             else:
                 fn_body += '\n'
+        fn_body += f"\ttry:\n" \
+                   f"\t\trequest_json = jsonify(request.json)\n" \
+                   f"\texcept:\n" \
+                   f"\t\trequest_json = None\n" \
+                   f"\treturn svc.{fn_name}({complete_params})\n"
 
-        fn_body += f"\treturn svc.{fn_name}({complete_params})\n"
-
-        Logger.info(f'\n=== Creating {fn_name} ===\n' + fn_body + '\n==================\n')
+        Logger.info(f'\n==================== ' + f'{fn_name}' + f' ====================\n' +
+                    fn_body +
+                    f'\n=============================================================\n')
 
         exec(fn_body)
         return locals()[fn_name]
@@ -125,13 +133,14 @@ class BuildAPI:
         self.fn_defaults.append(fn_defaults)
         self.fn_defaults_dt.append(fn_defaults_dt)
 
-        proxy_fn = self.make_fun(fn_name, fn_params, fn_defaults, fn_defaults_dt, self.strict_parameters_resolution)
+        proxy_fn = self.make_fun(fn_name, fn_params, fn_defaults, fn_defaults_dt, self.strict_parameters_resolution,
+                                 self.enforce_blank_defaults)
         setattr(self.ArgumentsBucket, fn_name, proxy_fn)
-        self.api_routes.route("/" + fn_name)(proxy_fn)
+        self.api_routes.route("/" + fn_name, methods=self.http_methods_list[index])(proxy_fn)
         Logger.info(' '.join(["\u2713 Binding fn:[", fn_name, "] to: endpoint [", self.endpoints_list[index], "]",
-                              "accepting HTTP methods:[", str(self.http_methods_list[index]),
-                              "] by matching the variables:", str(fn_params), "with the defaults classed as:",
-                              str(fn_defaults_dt), "at the function:[", str(proxy_fn), "]"]))
+                              "accepting HTTP methods:", str(self.http_methods_list[index]),
+                              "by matching the variables:", str(fn_params), "with the defaults classed as:",
+                              str(fn_defaults_dt), "at:", str(proxy_fn)]))
 
     def create_app(self, module_name):
         """
@@ -147,6 +156,10 @@ class BuildAPI:
         def root():
             return '</br>'.join([
                 '{appName} application running'.format(appName=module_name)])
+
+        @app.route('/favicon.ico')
+        def favicon():
+            return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
         @app.route('/postman')
         def get_postman_json():
@@ -164,9 +177,9 @@ class BuildAPI:
                 for j in range(len(self.fn_defaults_dt[i])):
                     if 'dict' in str(self.fn_defaults_dt[i][j]):
                         value = self.fn_defaults[i][j]
-                        ddph_id = 'ddph_id' + str(i) + str(j)
-                        self.fn_defaults[i][j] = ddph_id
-                        substitution_dictionary[ddph_id] = str(value)
+                        place_holder_for_json = 'place_holder_for_json' + str(i) + str(j)
+                        self.fn_defaults[i][j] = place_holder_for_json
+                        substitution_dictionary[place_holder_for_json] = str(value)
 
             params = {
                 "app_name": self.module_name,
@@ -185,18 +198,15 @@ class BuildAPI:
                 "port": self.port,
                 "prefix": self.prefix
             }
-            Logger.info(str(params))
             with open('auto_api_postman_collection_template.json', 'r') as file:
                 data = file.read()
             json_string = render_template_string(data, **params)
-            print(substitution_dictionary)
-            for entry in substitution_dictionary:
-                value = substitution_dictionary[entry]
-                json_string = json_string.replace(entry, value)
-
+            for place_holder_for_json in substitution_dictionary:
+                value = substitution_dictionary[place_holder_for_json]
+                json_string = json_string.replace(
+                    place_holder_for_json, str(value).replace("'", "\"").replace('"', '\\"'))
             parser = JsonComment(json)
             data = parser.loads(json_string)
-            Logger.warn(data)
             ep_response = app.response_class(
                 response=str(data).replace('\'', "\"").replace('\"{', '{').replace('}\"', '}'),
                 status=200,
@@ -205,9 +215,8 @@ class BuildAPI:
 
             for i in range(len(self.fn_defaults_dt)):
                 for j in range(len(self.fn_defaults_dt[i])):
-                    if 'dict' in str(self.fn_defaults_dt[i][j]) and 'ddph_id' in self.fn_defaults[i][j]:
+                    if 'dict' in str(self.fn_defaults_dt[i][j]) and 'place_holder_for_json' in self.fn_defaults[i][j]:
                         self.fn_defaults[i][j] = substitution_dictionary[self.fn_defaults[i][j]]
-
             return ep_response
 
         @app.errorhandler(400)
@@ -220,7 +229,7 @@ class BuildAPI:
 
     def __init__(self, target, module_name, prefix='auto', exclusion_list=[], inclusion_list=[],
                  http_methods_list=[], endpoints_list=[], strict_parameters_resolution=False, strict_slashes=False,
-                 host='0.0.0.0', port=5000):
+                 enforce_blank_defaults=False, host='0.0.0.0', port=5000):
 
         # Store the original parameters
         self.target = target
@@ -232,6 +241,7 @@ class BuildAPI:
         self.endpoints_list = endpoints_list
         self.strict_parameters_resolution = strict_parameters_resolution
         self.strict_slashes = strict_slashes
+        self.enforce_blank_defaults = enforce_blank_defaults
         self.host = host
         self.port = port
         self.fn_defaults = []
@@ -258,6 +268,7 @@ class BuildAPI:
         Logger.info('Routes Map:')
         Logger.info(auto_api.url_map)
         auto_api.run(debug=True, host=self.host, port=self.port)
+        auto_api.add_url_rule('/favicon.ico', redirect_to=url_for('static', filename='favicon.ico'))
 
 
 if __name__ == "__main__":
