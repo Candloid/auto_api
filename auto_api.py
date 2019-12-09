@@ -74,7 +74,7 @@ class BuildAPI:
         return result
 
     @staticmethod
-    def make_fun(fn_name, fn_params, fn_defaults, fn_defaults_dt, strict_parameters_resolution, enforce_blank_defaults):
+    def make_fun(fn_name, fn_params, fn_defaults, fn_defaults_dt, strict_parameters_resolution, ignore_defaults):
         def process_per_class(var, class_name):
             if 'str' in str(class_name):
                 return '\"' + str(var) + '\"'
@@ -97,7 +97,7 @@ class BuildAPI:
                 fn_body += "\t" + param + ' = request.args["' + param + '"]'
             else:
                 fn_body += "\t" + param + ' = request.args.get("' + param + '")'
-            if fn_defaults[i] != '' or enforce_blank_defaults:
+            if fn_defaults[i] != '' or ignore_defaults:
                 fn_body += ' or ' + process_per_class(str(fn_defaults[i]), fn_defaults_dt[i]) + '\n'
             else:
                 fn_body += '\n'
@@ -204,7 +204,7 @@ class BuildAPI:
             for place_holder_for_json in substitution_dictionary:
                 value = substitution_dictionary[place_holder_for_json]
                 json_string = json_string.replace(
-                    place_holder_for_json, str(value).replace("'", "\"").replace('"', '\\"'))
+                    place_holder_for_json, str(value).replace("'", "\"").replace('"', '\\\"'))
             parser = JsonComment(json)
             data = parser.loads(json_string)
             ep_response = app.response_class(
@@ -229,7 +229,7 @@ class BuildAPI:
 
     def __init__(self, target, module_name, prefix='auto', exclusion_list=[], inclusion_list=[],
                  http_methods_list=[], endpoints_list=[], strict_parameters_resolution=False, strict_slashes=False,
-                 enforce_blank_defaults=False, host='0.0.0.0', port=5000):
+                 ignore_defaults=False, host='0.0.0.0', port=5000):
 
         # Store the original parameters
         self.target = target
@@ -241,7 +241,7 @@ class BuildAPI:
         self.endpoints_list = endpoints_list
         self.strict_parameters_resolution = strict_parameters_resolution
         self.strict_slashes = strict_slashes
-        self.enforce_blank_defaults = enforce_blank_defaults
+        self.enforce_blank_defaults = ignore_defaults
         self.host = host
         self.port = port
         self.fn_defaults = []
@@ -272,4 +272,5 @@ class BuildAPI:
 
 
 if __name__ == "__main__":
-    b_api = BuildAPI(target='target', module_name='Service', prefix='', strict_parameters_resolution=False)
+    b_api = BuildAPI(target='target', module_name='Service', prefix='', strict_parameters_resolution=False,
+                     ignore_defaults=False)

@@ -8,30 +8,43 @@ class Service:
     @staticmethod
     def get_demo():
         """
-        Description for get_demo
+        This function serves no purpose rather than showing this stupid message in marquee!!
         """
-        return '<marquee><h1>' + inspect.currentframe().f_code.co_name + '</marquee>'
+        return '<marquee scrollamount="30"><h1>' + \
+               getattr(Service, inspect.currentframe().f_code.co_name).__doc__ + \
+               '</marquee>'
 
     @staticmethod
     def get_a(p1: int):
         """
         Description for get_a
+        :param p1 just a random parameter
+        :return returns the description of the function
         """
         if p1 is None:
             return 'Set a value for p1 please...'
-        return '<br>'.join([inspect.currentframe().f_code.co_name, str(p1), Service.get_b.__doc__])
+        return '<br>'.join([getattr(Service, inspect.currentframe().f_code.co_name).__doc__, str(p1)])
 
     def get_b(self, pa1='alpha', pa2=10, pa3=True):
         """
         Description for get_b
         """
-        return '<br>'.join([inspect.currentframe().f_code.co_name, str([pa1, pa2, pa3]), self.get_b.__doc__])
+        return '<br>'.join([getattr(Service, inspect.currentframe().f_code.co_name).__doc__,
+                            str(pa1), str(pa2), str(pa3)])
 
     def get_c(self):
         return self.__doc__
 
     def get_post_d(self, par1=[1, 2, 3, 4]):
-        return '<br>'.join([inspect.currentframe().f_code.co_name, str(par1), self.get_b.__doc__])
+        "Aight"
+        try:
+            return '<br>'.join([getattr(Service, inspect.currentframe().f_code.co_name).__doc__, str(par1)])
+        except:
+            return 'Seriously dude throw in a description for this function!!'
 
     def delete_e(self, param1={'some': 'map'}):
-        return '<br>'.join([inspect.currentframe().f_code.co_name, str(param1), self.get_b.__doc__])
+        """
+        I ain't deleting no BS bro
+        """
+        return '<br>'.join([getattr(Service, inspect.currentframe().f_code.co_name).__doc__, str(param1)])
+
