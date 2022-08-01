@@ -10,7 +10,7 @@ class MainModule:
     print("Source module got initiated...")
   
 
-  def get_some_sleep(self, really):
+  def get_some_sleep(self, really="Yes, really!"):
     return really
 
 
@@ -54,6 +54,8 @@ class MainModule:
     """
     Aight
     """
+    print(f'This is self = {self}')
+    print(f'This is d = {d}')
     return d
 
   def delete_f(self, param1={'some': 'map'}):

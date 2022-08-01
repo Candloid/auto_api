@@ -1,4 +1,7 @@
+from email.policy import default
 import os
+from ast import literal_eval
+from queue import Empty
 from flask import Flask, Blueprint, Response, request, render_template, send_from_directory
 import inspect
 from logger import Logger
@@ -9,6 +12,14 @@ LNF = "\n"
 target_module = None
 target = None
 module = None
+
+
+def contextify_response(resp):
+  if 'dict' in str(type(resp)):
+    # Transform dictionary responses into JSON
+    return Response(dumps(resp), mimetype='application/json')
+  else:
+    return str(resp)
 
 class AutoAPI:
   """
@@ -83,8 +94,8 @@ class AutoAPI:
         return '\"' + str(var) + '\"'
       elif 'dict' == class_name:
         return str(var).replace("'", "\"")
-      elif all(number == class_name for number in ['int', 'float', 'complex']):
-        return getattr(__builtins__, class_name)(var)
+      elif any(number == class_name for number in ['int', 'float', 'complex']):
+        return str(__builtins__[class_name](var))
       else:
         return str(var)
     
@@ -101,12 +112,13 @@ class AutoAPI:
       if fn_defaults[i] != '' or ignore_defaults:
         fn_body += ' or ' + process_per_class(str(fn_defaults[i]), fn_defaults_dt[i])
       fn_body += LNF
+      fn_body += TAB + f'print({param})' + LNF
+      fn_body += TAB + param + f' = __builtins__["{fn_defaults_dt[i]}"](' + \
+        ('literal_eval(' if fn_defaults_dt[i] == 'dict' else '') + f'{param})' + \
+        (')' if fn_defaults_dt[i] == 'dict' else '') + LNF
     fn_body += TAB + f"return_value = getattr(target_module,'{fn_name}')({complete_params})" + LNF
-    fn_body += TAB + f"if 'dict' in str(type(return_value)):" + LNF
-    fn_body += TAB*2 + f"return Response(dumps(return_value), mimetype='application/json')" + LNF
-
-    fn_body += TAB + f"else:" + LNF
-    fn_body += TAB*2 + f"return str(return_value)" + LNF
+    fn_body += TAB + f"print(f'return_value=" + "{" + "return_value}')" + LNF
+    fn_body += TAB + f"return contextify_response(return_value)" + LNF
 
     Logger.color(LNF + \
       '======================= ' + f'{fn_name}' + ' =======================\n' + \
@@ -123,19 +135,21 @@ class AutoAPI:
       Logger.warn("Duplicate function definition discarded for:" + fn_name)
       return
     fn_pointer = getattr(target_module, fn_name)
-    fn_params = list(inspect.signature(fn_pointer).parameters.keys())
-    found_self = 'self' in fn_params
-    if found_self:
-      found_self = True
-      fn_params.remove('self')
-    fn_defaults = list(inspect.signature(fn_pointer).parameters.values())
-    if found_self:
+    params = inspect.signature(fn_pointer).parameters
+
+    fn_params, fn_defaults = [list(a) for a in zip(*params.items())] if params else [[],[]]
+    '''
+    if 'self' in fn_params or 'cls' in fn_params:
+      fn_params.pop(0)
       fn_defaults.pop(0)
+    '''
     fn_defaults_dt = []
     for i in range(len(fn_defaults)):
+      dt = fn_defaults[i]._annotation if fn_defaults[i]._annotation is not inspect.Parameter.empty else \
+        type(fn_defaults[i].default) if fn_defaults[i].default is not inspect.Parameter.empty else 'str'
+      dt = str(dt).replace("<class '", "").replace("'>","")
+      fn_defaults_dt.append(dt)
       fn_defaults[i] = fn_defaults[i].default if fn_defaults[i].default is not inspect.Parameter.empty else ''
-    for fn_def in fn_defaults:
-      fn_defaults_dt.append(str(type(fn_def)))
     # Save at self
     self.fn_params.append(fn_params)
     self.fn_defaults.append(fn_defaults)
